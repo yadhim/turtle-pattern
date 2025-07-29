@@ -1,49 +1,38 @@
-from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models import User
-from app.schema import UserCreate, UserUpdate
+import requests
 
+def get_weather(city):
+    API_KEY = "e258412ed10f089fb116b2a5ee3913b8" 
+    BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
+    
+    params = {
+        'q': city,
+        'appid': API_KEY,
+        'units': 'metric'  # Get temperature in Celsius
+    }
+    
+    try:
+        response = requests.get(BASE_URL, params=params)
+        response.raise_for_status()  # Raise exception for HTTP errors
+        
+        data = response.json()
+        
+        # Extract relevant information
+        temp = data['main']['temp']
+        description = data['weather'][0]['description']
+        wind_speed = data['wind']['speed']
+        
+        print(f"\nWeather in {city}:")
+        print(f"Temperature: {temp}F")
+        print(f"Conditions: {description.capitalize()}")
+        print(f"Wind Speed: {wind_speed} km\hr")
+        
+    except requests.exceptions.HTTPError:
+        print(f"Error: City '{city}' not found. Please check the spelling.")
+    except requests.exceptions.ConnectionError:
+        print("Error: Network connection failed.")
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
 
-
-app = FastAPI()
-
-
-@app.get("/users/")
-def get_all_users(db: Session = Depends(get_db)):
-    return db.query(User).all()
-
-@app.get("/users/{user_id}")
-def get_user_by_email(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if user:
-        return user
-    raise HTTPException(status_code=404, detail="User not found")
-
-
-@app.post("/users/")
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = User(name=user.name, email=user.email, password=user.password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-@app.put("/users/{user_id}")
-def update_user_by_email(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.id == user_id).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    db_user.name = user.name
-    db_user.email = user.email
-    db.commit()
-    return {"message": "User updated successfully"}
-
-@app.delete("/users/{user_id}")
-def delete_user_by_email(user_id: int, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.id == user_id).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    db.delete(db_user)
-    db.commit()
-    return {"message": "User deleted successfully"}
+if __name__ == "__main__":
+    city = input("Enter city name: ")
+    get_weather(city)
